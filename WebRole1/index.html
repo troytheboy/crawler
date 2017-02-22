@@ -1,0 +1,77 @@
+﻿<!DOCTYPE html>
+<html>
+<head>
+    <title>Crawler</title>
+    <meta charset="utf-8" />
+    <link href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-BVYiiSIFeK1dGmJRAkycuHAHRg32OmUcww7on3RYdg4Va+PmSTsz/K68vbdEjh4u" crossorigin="anonymous">
+    <link href="/main.css" rel="stylesheet" type="text/css" />
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.1.1/jquery.min.js"></script>
+    <script src="https://code.jquery.com/ui/1.12.1/jquery-ui.js"></script>
+</head>
+<body>
+    <div class="jumbotron">
+        <div class="container">
+            <h1>Crawler</h1>
+        </div>
+    </div>
+    <div class="container">
+        <div class="row">
+            <div class="col-md-3">
+                <button class="danger" onclick="getStatus()"><h1>Get Status:</h1></button>
+            </div>
+            <div class="col-md-2">
+                <h1 class="status"></h1>
+            </div>
+        </div>
+    </div>
+    <div class="container">
+        <div class="row">
+            <div class="col-md-5">
+                <button class="danger" onclick="getSize()"><h1>Get Number of Urls:</h1></button>
+            </div>
+            <div class="col-md-1">
+                <h1 class="size"></h1>
+            </div>
+        </div>
+    </div>
+    <script>
+        var ajaxCall;
+        var data = { "query": ''};
+        function getStatus() {       
+                ajaxCall && ajaxCall.abort();
+                ajaxCall = $.ajax({
+                    type: "POST",
+                    url: "WebService1.asmx/getStatus",
+                    data: JSON.stringify(data),
+                    contentType: "application/json; charset=utf-8",
+                    dataType: "json",
+                    success: function (msg) {
+                        console.log(msg)
+                        $("h1.status").html("");
+                        $("h1.status").html("<h1>" + msg.d + "</h1>");
+                    },
+                    error: function (a, b, c) {
+                    }
+                })
+        }
+        function getSize() {
+            ajaxCall && ajaxCall.abort();
+            ajaxCall = $.ajax({
+                type: "POST",
+                url: "WebService1.asmx/getSize",
+                data: JSON.stringify(data),
+                contentType: "application/json; charset=utf-8",
+                dataType: "json",
+                success: function (msg) {
+                    console.log(msg)
+                    $("h1.size").html("");
+                    $("h1.size").html("<h1>" + msg.d + "</h1>");
+                },
+                error: function (a, b, c) {
+                }
+            })
+        }
+    </script>
+
+</body>
+</html>

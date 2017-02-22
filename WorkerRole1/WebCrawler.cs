@@ -79,9 +79,6 @@ namespace WorkerRole1
                     {
                         date = tag.Substring(15, 19);
                     }
-
-
-
                     if (tag.Contains("<a "))
                     {
                         string[] attributes = tag.Split(' ');

@@ -1,0 +1,7 @@
+So I ran into a huge time crunch with this project so unfortunately there's not much here.
+There was a family emergency that caused me to spend my weekend outside of Seattle, where my desktop with visual studio is.
+One thing I do have working is the status of the crawler on the dashboard. It will tell you if it is loading, crawling, or idling.
+I parsed bleacher report and cnn's robot.txt files, but my code is setup so it should be able to handle most any site's robots.txt and crawl that sites site maps.
+My Worker role does succesful crawls URLs and parse the html of urls given to it to grab the links on the page. It also checks and makes sure that the links aren't in the disallowed list I made using robots.txt.
+I do beleive I used the worker role properly. It takes orders from the queue, that's how the web role communicates with it. My code is definitely in c#.
+I'm sorry my assignment isn't that great but I did enjoy the challenge presented and learned quite a lot.

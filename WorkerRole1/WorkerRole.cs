@@ -110,6 +110,10 @@ namespace WorkerRole1
             }
             Trace.TraceInformation("WorkerRole1 has been started");
 
+            CloudQueueMessage message2 = new CloudQueueMessage("Idle");
+            status.Clear();
+            status.AddMessage(message2);
+
             while (true)
             {
                 CloudQueueMessage statusMessage = status.PeekMessage();

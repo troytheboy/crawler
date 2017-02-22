@@ -10,6 +10,18 @@ using System.Xml;
 using Microsoft.WindowsAzure.Storage.Queue;
 using Microsoft.WindowsAzure.Storage;
 using System.Configuration;
+using Microsoft.WindowsAzure.Storage.Table;
+using System.Web.Script.Services;
+using System.Diagnostics;
+using Microsoft.WindowsAzure.Storage.Blob;
+using System.Collections;
+using System.Web.Script.Serialization;
+using System.Xml.Serialization;
+using System.Web.UI;
+using System.Web.UI.WebControls;
+
+
+
 
 namespace WebRole1
 {
@@ -54,6 +66,41 @@ namespace WebRole1
         }
 
         [WebMethod]
+        [ScriptMethod(ResponseFormat = ResponseFormat.Json)]
+        public int getSize()
+        {
+
+            //Retrieve the storage account from the connection string.
+            CloudStorageAccount storageAccount = CloudStorageAccount.Parse(
+                ConfigurationManager.AppSettings["StorageConnectionString"]);
+
+            //Create the table client.
+            CloudTableClient tableClient = storageAccount.CreateCloudTableClient();
+
+            //Create the CloudTable object that represents the "people" table.
+            CloudTable table = tableClient.GetTableReference("crawledUrls");
+            table.CreateIfNotExists();
+            // Initialize a default TableQuery to retrieve all the entities in the table.
+            TableQuery<Page> tableQuery = new TableQuery<Page>();
+
+            // Initialize the continuation token to null to start from the beginning of the table.
+            //TableContinuationToken continuationToken = null;
+            int count = 0;
+            TableQuery<Page> query = new TableQuery<Page>().Where(TableQuery.GenerateFilterCondition("PartitionKey", QueryComparisons.LessThan, "2018"));
+
+            // Print the fields for each customer.
+            foreach (Page entity in table.ExecuteQuery(query))
+            {
+                //Console.WriteLine("{0}, {1}\t{2}\t{3}", entity.PartitionKey, entity.RowKey,
+                //    entity.Email, entity.PhoneNumber);
+                count++;
+            }
+
+            return count;
+        }
+
+        [WebMethod]
+        [ScriptMethod(ResponseFormat = ResponseFormat.Json)]
         public string getStatus()
         {
             CloudStorageAccount storageAccount = CloudStorageAccount.Parse(
@@ -66,16 +113,57 @@ namespace WebRole1
         }
 
         [WebMethod]
-        public string getLastUrl()
+        public int getTableSize()
         {
+            //CloudStorageAccount storageAccount = CloudStorageAccount.Parse(
+            //    ConfigurationManager.AppSettings["StorageConnectionString"]);
+            //CloudQueueClient queueClient = storageAccount.CreateCloudQueueClient();
+            //CloudQueue urls = queueClient.GetQueueReference("urls");
+            //queue.CreateIfNotExists();
+
+            // Retrieve the storage account from the connection string.
             CloudStorageAccount storageAccount = CloudStorageAccount.Parse(
                 ConfigurationManager.AppSettings["StorageConnectionString"]);
-            CloudQueueClient queueClient = storageAccount.CreateCloudQueueClient();
-            CloudQueue urls = queueClient.GetQueueReference("urls");
-            queue.CreateIfNotExists();
 
-            return urls.PeekMessage().AsString;
+            // Create the table client.
+            CloudTableClient tableClient = storageAccount.CreateCloudTableClient();
+
+            // Create the CloudTable object that represents the "people" table.
+            CloudTable table = tableClient.GetTableReference("crawledUrls");
+            table.CreateIfNotExists();
+
+            TableQuery<Page> tableQuery = new TableQuery<Page>();
+
+            return 0;
+            //return urls.PeekMessage().AsString;
         }
+
+        //[WebMethod]
+        //public List<string[]> get10Urls()
+        //{
+        //    List<string[]> s = new List<string[]>();
+
+        //    Retrieve the storage account from the connection string.
+        //   CloudStorageAccount storageAccount = CloudStorageAccount.Parse(
+        //       ConfigurationManager.AppSettings["StorageConnectionString"]);
+
+        //    Create the table client.
+        //    CloudTableClient tableClient = storageAccount.CreateCloudTableClient();
+
+        //    Create the CloudTable object that represents the "people" table.
+        //   CloudTable table = tableClient.GetTableReference("crawledUrls");
+        //    table.CreateIfNotExists();
+
+        //    Create the table query.
+        //    TableQuery<Page> query = new TableQuery<Page>().Where(TableQuery.GenerateFilterCondition("PartitionKey", QueryComparisons.Equal, "2017"));
+
+        //    Loop through the results, displaying information about the entity.
+        //    foreach (Page entity in table.ExecuteQuery(query))
+        //    {
+        //        //Console.WriteLine("{0}, {1}\t{2}\t{3}", entity.PartitionKey, entity.RowKey,
+        //        //    entity.Email, entity.PhoneNumber);
+        //    }
+        //}
 
         [WebMethod]
         public List<string> Crawl()
@@ -113,7 +201,6 @@ namespace WebRole1
 
             // get urls from sitemaps
             List<string> urls = new List<string>();
-            List<Page> pages = new List<Page>();
             XmlDocument xmlDoc = new XmlDocument(); // Create an XML document object
             List<string> indexedMaps = new List<string>();
 
@@ -150,97 +237,16 @@ namespace WebRole1
                 foreach (XmlNode node in nodes)
                 {
                     XmlNodeList children = node.ChildNodes;
-                    Page page = new Page();
 
                     XmlNode loc = node.FirstChild;
                     urls.Add(loc.InnerText);
-
-                    foreach (XmlNode child in children)
-                    {
-                        string name = child.Name;
-                        if (name.Equals("loc"))
-                        {
-                            page.setUrl(child.InnerText);                     
-                        }
-                        if (name.Equals("news:news"))
-                        {
-                            XmlNodeList grandChildren = child.ChildNodes;
-                            foreach (XmlNode grandChild in grandChildren)
-                            {
-                                if (grandChild.Name.Equals("news:publication_date"))
-                                {
-                                    page.setDate(grandChild.InnerText);
-                                }
-                                if (grandChild.Name.Equals("news:title"))
-                                {
-                                    page.setTitle(grandChild.InnerText);
-                                }
-                            }
-                        }                
-                    }
-                    pages.Add(page);
                 }
 
             }
             List<string> pageString = new List<string>();
-            foreach (Page p in pages)
-            {
-                pageString.Add(p.ToString());
-            }
+            
             return pageString;
         }
-
-        public interface Document
-        {
-            void setTitle(string title);
-            string getTitle();
-            void setUrl(string url);
-            string getUrl();
-        }
-
-        public class Page : Document
-        {
-            private string title;
-            private string url;
-            private string date;
-
-            public void setTitle(string title)
-            {
-                this.title = title;
-            }
-
-            public string getTitle()
-            {
-                return this.title;
-            }
-
-            public void setUrl(string url)
-            {
-                this.url = url;
-            }
-
-            public string getUrl()
-            {
-                return this.url;
-            }
-
-            public void setDate(string date)
-            {
-                this.date = date;
-            }
-
-            public string getDate()
-            {
-                return this.date;
-            }
-
-            public override string ToString()
-            {
-                string s = "" + this.getUrl();
-                return s;
-            }
-        }
-
 
         [WebMethod]
         public List<string> HtmlTest(string url)
@@ -310,7 +316,6 @@ namespace WebRole1
                 return links;
             }
             return s.ToList();
-            //return data;
         }
     }
 }

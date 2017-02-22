@@ -5,7 +5,7 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace WorkerRole1
+namespace WebRole1
 {
     public class Page : TableEntity
     {
@@ -14,8 +14,8 @@ namespace WorkerRole1
 
         public Page(string title, string date, string url)
         {
-            this.PartitionKey = date.Substring(0,4);
-            this.RowKey = date.Substring(5,5);
+            this.PartitionKey = date.Substring(0, 4);
+            this.RowKey = date.Substring(5, 5);
             this.url = url;
             this.date = date;
         }
