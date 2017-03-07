@@ -43,7 +43,7 @@ namespace WebRole1
         private static CloudQueue statusQueue = queueClient.GetQueueReference("status");
         private static CloudQueue toCrawl = queueClient.GetQueueReference("urls");
         private static CloudQueue lastCrawled = queueClient.GetQueueReference("crawled");
-        //private static CloudQueue numCrawledQueue = queueClient.GetQueueReference("num-crawled");
+        private static Dictionary<string, List<string>> cache = new Dictionary<string, List<string>>();
 
 
 
@@ -55,6 +55,16 @@ namespace WebRole1
             statusQueue.AddMessageAsync(crawling);
             CloudQueueMessage idle = statusQueue.GetMessage();
             statusQueue.DeleteMessage(idle);
+        }
+
+        [WebMethod]
+        [ScriptMethod(ResponseFormat = ResponseFormat.Json)]
+        public void stopCrawl()
+        {
+            CloudQueueMessage stop = new CloudQueueMessage("Paused");
+            statusQueue.AddMessageAsync(stop);
+            CloudQueueMessage crawl = statusQueue.GetMessage();
+            statusQueue.DeleteMessage(crawl);
         }
 
         [WebMethod]
@@ -78,10 +88,19 @@ namespace WebRole1
         [WebMethod]
         [ScriptMethod(ResponseFormat = ResponseFormat.Json)]
         public List<string> getCrawled(string searchQuery)
-        {
+        {   
+            if (cache.Count > 100)
+            {
+                cache.Clear();
+            }
+            List<string> urls = new List<string>();
+            if (cache.Keys.Contains(searchQuery))
+            {
+                cache.TryGetValue(searchQuery, out urls);
+                return urls;
+            }
             List<string> s = new List<string>();
             string[] splitQuery = searchQuery.Split(' ');
-            List<string> urls = new List<string>();
             //Create the table client.
             CloudTableClient tableClient = storageAccount.CreateCloudTableClient();
             try
@@ -138,12 +157,12 @@ namespace WebRole1
                         urls.Add(url);
                     }
                 }
+                cache.Add(searchQuery, urls);
             }
             catch (Exception e)
             {
                 Debug.WriteLine(e);
             }
-
             return urls;
         }
 
@@ -176,6 +195,7 @@ namespace WebRole1
             }
             return "Updating...";
         }
+
         [WebMethod]
         public String downloadWiki()
         {
@@ -197,11 +217,13 @@ namespace WebRole1
             }
             return "";
         }
+
         public static Trie t = new Trie();
         [WebMethod]
         public Trie buildTrie()
         {
             PerformanceCounter memProcess = new PerformanceCounter("Memory", "Available MBytes");
+
             try
             {   // Open the text file using a stream reader.
                 using (StreamReader sr = new StreamReader(FILE_LOCATION))
@@ -227,9 +249,12 @@ namespace WebRole1
             {
                 Debug.WriteLine("The file could not be read:");
                 Debug.WriteLine(e.Message);
+                downloadWiki();
+                buildTrie();
             }
             return t;
         }
+
         public List<string> titles = new List<string>();
         [WebMethod]
         [ScriptMethod(ResponseFormat = ResponseFormat.Json)]

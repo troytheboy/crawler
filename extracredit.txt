@@ -1,0 +1,10 @@
+Extra Credit:
+
+1. Beatiful Search Results Page:
+
+My page looks like a spoof of cnn. The title is in the cnn font and I think that's pretty.
+When you get a result for a basketball player their headshot appears in their stats box.
+
+4. Google instant (AJAX, every keystroke => update results page)
+
+My assignment does this! I promise. Just type in anything in the search bar.

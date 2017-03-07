@@ -23,6 +23,7 @@ namespace WorkerRole1
                 ConfigurationManager.AppSettings["StorageConnectionString"]);
         private static CloudQueueClient queueClient = storageAccount.CreateCloudQueueClient();
         private static CloudQueue toCrawl = queueClient.GetQueueReference("urls");
+        private static CloudQueue status = queueClient.GetQueueReference("status");
         private static CloudQueue crawled = queueClient.GetQueueReference("crawled");
         private static CloudTableClient tableClient = storageAccount.CreateCloudTableClient();
         private static CloudTable table = tableClient.GetTableReference("crawled");
@@ -41,7 +42,8 @@ namespace WorkerRole1
                 try
                 {
                     CloudQueueMessage message = await toCrawl.PeekMessageAsync();
-                    while (message != null)
+                    CloudQueueMessage statusMessage = await status.PeekMessageAsync();
+                    while (message != null && statusMessage.AsString == "Start")
                     {
                         message = await toCrawl.GetMessageAsync();
                         try
@@ -87,7 +89,6 @@ namespace WorkerRole1
                 {
                     Debug.WriteLine(e);
                 }
-                
                 await Task.Delay(1000);
             }
         }

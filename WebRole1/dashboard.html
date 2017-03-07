@@ -55,6 +55,9 @@
                 <button class="btn btn-info" onclick="getNumCrawled()">URLs Crawled</button>
                 <bold class="numCrawled"></bold>
             </div>
+            <div class="col-md-4 col-sm-4 text-center">
+                <button class="btn btn-danger" onclick="stopCrawl()">Stop Crawl</button>
+            </div>
         </div>
     </div>
     <script>
@@ -83,7 +86,7 @@
         function getCrawled() {
             var data = { "searchQuery": ($('#searchBar').val().toLowerCase()) };
             console.log(data);
-            ajaxCall && ajaxCall.abort();
+            //ajaxCall && ajaxCall.abort();
             ajaxCall = $.ajax({
                 type: "POST",
                 url: "WebService1.asmx/getCrawled",
@@ -109,7 +112,7 @@
         }
         var numCrawled = 0;
         function getNumCrawled() {
-            ajaxCall && ajaxCall.abort();
+            //ajaxCall && ajaxCall.abort();
             ajaxCall = $.ajax({
                 type: "POST",
                 url: "WebService1.asmx/getNumCrawled",
@@ -132,7 +135,7 @@
             })
         }
         function startCrawl() {
-            ajaxCall && ajaxCall.abort();
+            //ajaxCall && ajaxCall.abort();
             ajaxCall = $.ajax({
                 type: "POST",
                 url: "WebService1.asmx/startCrawl",
@@ -141,6 +144,22 @@
                 dataType: "json",
                 success: function () {
                     console.log('started crawling')
+                    //getStatus();
+                },
+                error: function () {
+                }
+            })
+        }
+        function stopCrawl() {
+            //ajaxCall && ajaxCall.abort();
+            ajaxCall = $.ajax({
+                type: "POST",
+                url: "WebService1.asmx/stopCrawl",
+                data: JSON.stringify(data),
+                contentType: "application/json; charset=utf-8",
+                dataType: "json",
+                success: function () {
+                    console.log('paused crawling')
                     //getStatus();
                 },
                 error: function () {

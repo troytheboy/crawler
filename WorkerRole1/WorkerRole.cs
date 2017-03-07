@@ -62,25 +62,23 @@ namespace WorkerRole1
             }
 
             // Set the maximum number of concurrent connections
-            ServicePointManager.DefaultConnectionLimit = 12;
-            //ServicePointManager.Expect100Continue = false;
-
-            // For information on handling configuration changes
-            // see the MSDN topic at https://go.microsoft.com/fwlink/?LinkId=166357.
+            ServicePointManager.DefaultConnectionLimit = 100;
+            ServicePointManager.Expect100Continue = false;
 
             bool result = base.OnStart();
-
+            try
+            {
+                updateStatus("Crawling");
+            }
+            catch (Exception e)
+            {
+                Debug.WriteLine(e);
+            }
             // create sitemappers
             SiteMapper cnnMapper = new SiteMapper("http://www.cnn.com");
 
             List<string> cnnUrls = cnnMapper.getUrls();
             List<string> disallow = cnnMapper.getDisallow();
-            //SiteMapper brMapper = new SiteMapper("http://www.bleacherreport.com");
-            //List<string> brUrls = brMapper.getUrls();
-            //disallow.AddRange(brMapper.getDisallow());
-
-            // create web crawlers
-            //WebCrawler crawlie = new WebCrawler(disallow);
 
             Trace.TraceInformation("WorkerRole1 has been started");
 
@@ -101,47 +99,47 @@ namespace WorkerRole1
             return result;
         }
 
-        private void crawl(WebCrawler crawlie)
-        {
-            CloudQueueMessage message = toCrawl.PeekMessage();
-            while(message != null)
-            {
-                message = toCrawl.GetMessage();
-                toCrawl.DeleteMessage(message);
-                string url = message.AsString;
-                string cnn = "cnn.com";
-                string br = "bleacherreport.com";
-                if (url.Contains('.'))
-                {
-                    if (url.StartsWith("//"))
-                    {
-                        url = url.Replace("//", "http://www.");
-                    }
-                    try
-                    {
-                        HttpWebRequest request = (HttpWebRequest)WebRequest.Create(url);
-                        request.Proxy = null;
-                        HttpWebResponse response = (HttpWebResponse)request.GetResponse();
-                        if (url.Contains(cnn))
-                        {
-                            crawlie.CrawlPage(response, url, cnn);
-                        }
-                        else if (url.Contains(br))
-                        {
-                            crawlie.CrawlPage(response, url, br);
-                        }
-                    }
-                    catch (WebException we)
-                    {
-                        if (we.Equals("test"))
-                        {
+        //private void crawl(WebCrawler crawlie)
+        //{
+        //    CloudQueueMessage message = toCrawl.PeekMessage();
+        //    while(message != null)
+        //    {
+        //        message = toCrawl.GetMessage();
+        //        toCrawl.DeleteMessage(message);
+        //        string url = message.AsString;
+        //        string cnn = "cnn.com";
+        //        string br = "bleacherreport.com";
+        //        if (url.Contains('.'))
+        //        {
+        //            if (url.StartsWith("//"))
+        //            {
+        //                url = url.Replace("//", "http://www.");
+        //            }
+        //            try
+        //            {
+        //                HttpWebRequest request = (HttpWebRequest)WebRequest.Create(url);
+        //                request.Proxy = null;
+        //                HttpWebResponse response = (HttpWebResponse)request.GetResponse();
+        //                if (url.Contains(cnn))
+        //                {
+        //                    crawlie.CrawlPage(response, url, cnn);
+        //                }
+        //                else if (url.Contains(br))
+        //                {
+        //                    crawlie.CrawlPage(response, url, br);
+        //                }
+        //            }
+        //            catch (WebException we)
+        //            {
+        //                if (we.Equals("test"))
+        //                {
 
-                        }
-                        continue;
-                    }
-                }
-            }
-        }
+        //                }
+        //                continue;
+        //            }
+        //        }
+        //    }
+        //}
 
         private void updateStatus(string statusMessage)
         {

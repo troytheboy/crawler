@@ -109,7 +109,9 @@
     <Content Include="dashboard.html" />
     <Content Include="index.html" />
     <Content Include="packages.config" />
+    <Content Include="extracredit.txt" />
     <Content Include="WebRole1.csproj.user" />
+    <Content Include="writeup.txt" />
     <None Include="Web.Debug.config">
       <DependentUpon>Web.config</DependentUpon>
     </None>

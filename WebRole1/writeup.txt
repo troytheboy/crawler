@@ -1,0 +1,8 @@
+So for this assignment I pretty much just improved my PA-3 a whole bunch until it was up to snuff with what PA-4 required and then added together PA-1 and PA-2.
+My web crawler grabs all of the sitemaps from 2017 from cnn and the nba sitemap from bleacher report, then it iterates through those site maps adding links to my 'toCrawl' queue.
+I left my PA-2 the same as it already was since it worked well on that assignment and is sufficient for this one too.
+My PA-1 I changed up quite a bit so it could accept a POST request and return to my javascript the relevant player stats in JSON though ajax.
+Query suggestions appear on either side of the search box while querying. They show up quickly and are relevant suggestions.
+I have a dashboard at /dashboard.html. 
+My code is in c# :).
+My PA-1 is on AWS, I'm using both Web and Worker Roles and making use of queues and a table.
