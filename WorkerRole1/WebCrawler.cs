@@ -10,47 +10,101 @@ using System.Text;
 using System.Threading.Tasks;
 using System.Xml;
 using Microsoft.Azure;
+using System.Text.RegularExpressions;
+using Microsoft.WindowsAzure.Storage.Queue;
+using System.Diagnostics;
 
 namespace WorkerRole1
 {
     class WebCrawler
     {
         private List<string> disallow;
+        private static CloudStorageAccount storageAccount = CloudStorageAccount.Parse(
+                ConfigurationManager.AppSettings["StorageConnectionString"]);
+        private static CloudQueueClient queueClient = storageAccount.CreateCloudQueueClient();
+        private static CloudQueue toCrawl = queueClient.GetQueueReference("urls");
+        private static CloudQueue crawled = queueClient.GetQueueReference("crawled");
+        private static CloudTableClient tableClient = storageAccount.CreateCloudTableClient();
+        private static CloudTable table = tableClient.GetTableReference("crawled");
+        private static List<string> links = new List<string>();
+        private string title;
 
         public WebCrawler(List<string> rules)
         {
             disallow = rules;
+            crawl();
         }
 
-        public List<string> CrawlPage(HttpWebResponse response, string url)
+        private async void crawl()
         {
-            //CloudStorageAccount storageAccount = CloudStorageAccount.Parse(
-            //ConfigurationManager.AppSettings["StorageConnectionString"]);
+            while (true) {
+                try
+                {
+                    CloudQueueMessage message = await toCrawl.PeekMessageAsync();
+                    while (message != null)
+                    {
+                        message = await toCrawl.GetMessageAsync();
+                        try
+                        {
+                            await toCrawl.DeleteMessageAsync(message);
+                            string url = message.AsString;
+                            string cnn = "cnn.com";
+                            string br = "bleacherreport.com";
+                            if (url.Contains('.'))
+                            {
+                                if (url.StartsWith("//"))
+                                {
+                                    url = url.Replace("//", "http://www.");
+                                }
+                                try
+                                {
+                                    HttpWebRequest request = (HttpWebRequest)WebRequest.Create(url);
+                                    request.Proxy = null;
+                                    HttpWebResponse response = (HttpWebResponse)await request.GetResponseAsync();
+                                    if (url.Contains(cnn))
+                                    {
+                                        await CrawlPage(response, url, cnn);
+                                    }
+                                    else if (url.Contains(br))
+                                    {
+                                        await CrawlPage(response, url, br);
+                                    }
+                                }
+                                catch (Exception we)
+                                {
+                                    Debug.WriteLine(we);
+                                }
+                            }
+                            await Task.Delay(1000);
+                        }
+                        catch (Exception e)
+                        {
+                            Debug.WriteLine(e);
+                        }
+                    }
+                }
+                catch (Exception e)
+                {
+                    Debug.WriteLine(e);
+                }
+                
+                await Task.Delay(1000);
+            }
+        }
 
-            //CloudTableClient tableClient = storageAccount.CreateCloudTableClient();
-            //CloudTable table = tableClient.GetTableReference("pages");
-            //table.CreateIfNotExists();
-
-            // Retrieve the storage account from the connection string.
-            CloudStorageAccount storageAccount = CloudStorageAccount.Parse(
-                ConfigurationManager.AppSettings["StorageConnectionString"]);
-
-            // Create the table client.
-            CloudTableClient tableClient = storageAccount.CreateCloudTableClient();
-
-            // Create the CloudTable object that represents the "people" table.
-            CloudTable table = tableClient.GetTableReference("crawledUrls");
-            table.CreateIfNotExists();
-
-
-            List<string> links = new List<string>();
-
-            string data = "";
-            string[] s = new string[1];
-            //HttpWebRequest request = (HttpWebRequest)WebRequest.Create(url);
-
-            //HttpWebResponse response = (HttpWebResponse)request.GetResponse();
-            if (response.StatusCode == HttpStatusCode.OK)
+        public async Task CrawlPage(HttpWebResponse response,string address, string url)
+        {
+            string link = "";
+            Boolean illegalLink = false;
+            // check disallowed from robots
+            foreach (string disallowed in disallow)
+            {
+                if(url.Contains(disallowed))
+                {
+                    illegalLink = true;
+                }
+            }
+            if (response.StatusCode == HttpStatusCode.OK && !illegalLink)
             {
                 Stream receiveStream = response.GetResponseStream();
                 StreamReader readStream = null;
@@ -63,86 +117,113 @@ namespace WorkerRole1
                 {
                     readStream = new StreamReader(receiveStream, Encoding.GetEncoding(response.CharacterSet));
                 }
-
-                data = readStream.ReadLine().Replace(">", ">|");
-                string[] htmlTags = data.Split('|');
-                string date = "";
-                string title = "";
-                foreach (string tag in htmlTags)
+                string wholePage = readStream.ReadToEnd();
+                var titleRegex = new Regex("<title>(.*?[^\"])</title>");
+                var titleMatch = titleRegex.Match(wholePage);
+                this.title = titleMatch.ToString();
+                this.title = this.title.Replace("<title>", "");
+                this.title = this.title.Replace("</title>", "");
+                string[] titleArray = this.title.Trim().Replace(" - ", " ").Split(' ');
+                var regex = new Regex("<a\\shref=[\"]([^\"]*)");
+                var matches = regex.Matches(wholePage);
+                foreach (Match match in matches)
                 {
-
-                    if (tag.Contains("</title>"))
+                    link = match.ToString();
+                    link = link.Substring(9);
+                    if (link.StartsWith("//"))
                     {
-                        title = tag.Replace("</title>", "");
-                    }
-                    if (tag.Contains("lastmod"))
+                        link = link.Replace("//", "http://www.");
+                    } else if (link.StartsWith("/"))
                     {
-                        date = tag.Substring(15, 19);
-                    }
-                    if (tag.Contains("<a "))
-                    {
-                        string[] attributes = tag.Split(' ');
-                        foreach (string attribute in attributes)
+                        if (url.Contains("cnn.com"))
                         {
-                            if (attribute.Contains("href"))
-                            {
-                                string link = attribute.Substring(5);
-                                int length = link.Length;
-                                link = link.Replace("\"", "");
-                                link = link.Replace(">", "");
-                                if (link.StartsWith("//"))
-                                {
+                            link = "http://www.cnn.com" + link;
+                        }
+                        if (url.Contains("bleacherreport.com"))
+                        {
+                            link = "http://www.bleacherreport.com" + link;
+                        }
+                    }
+                    if (link.Contains("cnn.com") || link.Contains("bleacherreport.com"))
+                    {
+                        links.Add(link);
+                        CloudQueueMessage urlToCrawl = new CloudQueueMessage(link);
+                        try
+                        {
+                            await toCrawl.AddMessageAsync(urlToCrawl);
 
-                                }
-                                else if (link.StartsWith("/"))
-                                {
-                                    if (url.Contains("cnn.com"))
-                                    {
-                                        link = "http://www.cnn.com" + link;
-
-                                    }
-                                    else if (url.Contains("bleacherreport.com"))
-                                    {
-                                        link = "http://www.bleacherreport.com" + link;
-                                    }
-                                }
-                                if (link.Contains("cnn.com") || link.Contains("bleacherreport.com"))
-                                {
-                                    bool allowed = true;
-                                    foreach (string dis in disallow)
-                                    {
-                                        if (link.Contains(dis))
-                                        {
-                                            allowed = false;
-                                        }
-                                    }
-                                    if (allowed)
-                                    {
-                                        links.Add(link);
-                                    }
-                                }
-                            }
+                        }
+                        catch (Exception e)
+                        {
+                            Debug.WriteLine(e);
                         }
                     }
                 }
-                Page crawledPage = new Page(title, date, url);
-                TableOperation insertOperation = TableOperation.Insert(crawledPage);
-                try {
-                    table.Execute(insertOperation);
-                }
-                catch 
+                if (address.Contains("cnn.com") || address.Contains("bleacherreport.com"))
                 {
-                    //continue;
+                    DateTime crawlTime =  DateTime.Today;
+                    char[] noNos = { ':',';',',','?','$','(',')','+','=','-','"' };
+                    string firstWord = titleArray[0];
+                    foreach (char c in noNos)
+                    {
+                        firstWord.Replace(c + "", "");
+                    }
+                    if (firstWord.StartsWith("'"))
+                    {
+                        firstWord = firstWord.Substring(1);
+                    }
+                    string linkAddress = address.Replace('/', '$');
+                    firstWord = firstWord.ToLower();
+                    TableOperation retrieveOperation = TableOperation.Retrieve<CrawledLink>(firstWord, linkAddress);
+                    try
+                    {
+                        TableResult retrievedResult = await table.ExecuteAsync(retrieveOperation);
+                        if (retrievedResult.Result == null)
+                        {
+                            foreach (string word in titleArray)
+                            {
+                                string wordCopy = word.ToLower();
+                                if (wordCopy != "")
+                                {
+                                    foreach (char c in noNos)
+                                    {
+                                        wordCopy = word.Replace(c + "", "");
+                                    }
+                                    if (wordCopy.StartsWith("'"))
+                                    {
+                                        wordCopy = wordCopy.Substring(1);
+                                    }
+                                    CrawledLink crawledPage = new CrawledLink(wordCopy, title, address);
+                                    TableOperation insertOperation = TableOperation.InsertOrMerge(crawledPage);
+                                    try
+                                    {
+                                        await table.ExecuteAsync(insertOperation);
+                                    }
+                                    catch (Exception e)
+                                    {
+                                        Debug.WriteLine(address + "\n" + "Error: " + e.ToString());
+                                    }
+                                }
+                            }
+                            CloudQueueMessage crawledURL = new CloudQueueMessage(address);
+                            try
+                            {
+                                await crawled.AddMessageAsync(crawledURL);
+                            }
+                            catch (Exception e)
+                            {
+                                Debug.WriteLine(e);
+                            }
+                        }
+                    }
+                    catch (Exception e)
+                    {
+                        Debug.WriteLine("Error in WebCrawler-CrawlPage: "+e.ToString());
+                    }
                 }
-
                 response.Close();
                 readStream.Close();
-                return links;
             }
-            return new List<string>();
-            //return data;
         }
     }
-
-
 }

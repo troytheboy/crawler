@@ -3,14 +3,14 @@
   <Role name="WebRole1">
     <Instances count="1" />
     <ConfigurationSettings>
-      <Setting name="Microsoft.WindowsAzure.Plugins.Diagnostics.ConnectionString" value="DefaultEndpointsProtocol=https;AccountName=counter;AccountKey=$(_counter.key_)" />
+      <Setting name="Microsoft.WindowsAzure.Plugins.Diagnostics.ConnectionString" value="DefaultEndpointsProtocol=https;AccountName=generalporpoise;AccountKey=OOm7LY4PtBM+PI6yiu3KF02Jrbhivv+HQb3tgfxEXBC8t1RJRJRZlSb5LS9heng2jTm1cxYtZ1r04XCx6gx8pA==" />
       <Setting name="APPINSIGHTS_INSTRUMENTATIONKEY" value="edcce368-4b54-4821-9b14-67f1c5de3694" />
     </ConfigurationSettings>
   </Role>
   <Role name="WorkerRole1">
     <Instances count="1" />
     <ConfigurationSettings>
-      <Setting name="Microsoft.WindowsAzure.Plugins.Diagnostics.ConnectionString" value="DefaultEndpointsProtocol=https;AccountName=counter;AccountKey=$(_counter.key_)" />
+      <Setting name="Microsoft.WindowsAzure.Plugins.Diagnostics.ConnectionString" value="DefaultEndpointsProtocol=https;AccountName=generalporpoise;AccountKey=OOm7LY4PtBM+PI6yiu3KF02Jrbhivv+HQb3tgfxEXBC8t1RJRJRZlSb5LS9heng2jTm1cxYtZ1r04XCx6gx8pA==" />
       <Setting name="APPINSIGHTS_INSTRUMENTATIONKEY" value="edcce368-4b54-4821-9b14-67f1c5de3694" />
     </ConfigurationSettings>
   </Role>

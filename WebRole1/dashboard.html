@@ -1,0 +1,182 @@
+﻿<!DOCTYPE html>
+<html>
+<head>
+    <title>Crawler</title>
+    <meta charset="utf-8" />
+    <link href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-BVYiiSIFeK1dGmJRAkycuHAHRg32OmUcww7on3RYdg4Va+PmSTsz/K68vbdEjh4u" crossorigin="anonymous">
+    <link href="/main.css" rel="stylesheet" type="text/css" />
+    <link rel="icon" href="/favicon.ico" type="image/x-icon" sizes="16x16">
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.1.1/jquery.min.js"></script>
+    <script src="https://code.jquery.com/ui/1.12.1/jquery-ui.js"></script>
+</head>
+<body>
+    <nav class="navbar navbar-inverse navbar-fixed-top">
+        <div class="container-fluid">
+            <div class="navbar-haeder">
+                <button class="navbar-toggle collapsed" type="button" data-toggle="collapse" data-target="#navbar" aria-expanded="false" aria-controls="navbar"></button>
+                <a class="navbar-brand" href="#">Crawler</a>
+            </div>
+            <div id="navbar" class="navbar-collapse collapse">
+                <ul class="nav navbar-nav navbar-right"></ul>
+                <div class="navbar-form navbar-right">
+                    <input id="searchBar" name="searchBar" class="form-control" placeholder="Search..." type="text">
+                    <button class="btn btn-success" onclick="getCrawled()">Search Table</button>
+                </div>
+            </div>
+        </div>
+    </nav>
+    <div class="container-fluid">
+        <br>
+        <h1 class="page-header">Crawler Dashboard</h1>
+        <div class="row">
+            <div class="col-md-4 col-sm-4 text-center">
+                <button class="btn btn-info" onclick="getStatus()">Get Status</button>
+                <bold class="status"><h3></h3></bold>
+            </div>
+            <div class="col-md-4 col-sm-4 text-center">
+                <button class="btn btn-info" onclick="getToCrawl()">URLs Left to Crawl</button>
+                <bold class="toCrawl"></bold>
+            </div>
+            <div class="col-md-4 col-sm-4 text-center">
+                <button class="btn btn-success" onclick="startCrawl()">Start Crawl</button>
+            </div>
+        </div>
+        <div class="row">
+            <!--<div class="col-md-4 col-sm-4 text-center">
+                <button class="btn btn-info" onclick="getSize()">Get Size</button>
+                <bold class="crawled"></bold>
+            </div>-->
+            <div class="col-md-4 col-sm-4 text-center">
+                <button class="btn btn-info" onclick="getCrawled()">Search Results</button>
+                <br><br>
+                <table class="table table-striped table-bordered text-left"><tbody class="crawled"></tbody></table>
+            </div>
+            <div class="col-md-4 col-sm-4 text-center">
+                <button class="btn btn-info" onclick="getNumCrawled()">URLs Crawled</button>
+                <bold class="numCrawled"></bold>
+            </div>
+        </div>
+    </div>
+    <script>
+        $(document).ready(getStatus());
+        var ajaxCall;
+        var data = { "searchQuery": ($('#searchBar').val()) };
+        function getStatus() {       
+                ajaxCall && ajaxCall.abort();
+                ajaxCall = $.ajax({
+                    type: "POST",
+                    url: "WebService1.asmx/getStatus",
+                    data: JSON.stringify(data),
+                    contentType: "application/json; charset=utf-8",
+                    dataType: "json",
+                    success: function (msg) {
+                        
+                        $("bold.status").html("");
+                        $("bold.status").html("<h3>" + msg.d + "</h3>");
+                        getToCrawl();
+                        setTimeout(getStatus, 8000)
+                    },
+                    error: function (a, b, c) {
+                    }
+                })
+        }
+        function getCrawled() {
+            var data = { "searchQuery": ($('#searchBar').val().toLowerCase()) };
+            console.log(data);
+            ajaxCall && ajaxCall.abort();
+            ajaxCall = $.ajax({
+                type: "POST",
+                url: "WebService1.asmx/getCrawled",
+                data: JSON.stringify(data),
+                contentType: "application/json; charset=utf-8",
+                dataType: "json",
+                success: function (msg) {
+                    //console.log(msg)
+                    $("tbody.crawled").html("<tr><th>Count</th><th class=\"text-center\">URL</th></tr>");
+                    var count = 0;
+                    msg.d.forEach(function (link) {
+                        count++;
+                        console.log(link);
+                        $("tbody.crawled").append("<tr><td>" + count + "</td><td><a href =\"" + link + "\">" + link + "</a></td></tr>")
+                    })
+                    if (count == 0) {
+                        $("tbody.crawled").html("<tr><th class=\"text-center\">No results</th></tr>");
+                    }
+                },
+                error: function (a, b, c) {
+                }
+            })
+        }
+        var numCrawled = 0;
+        function getNumCrawled() {
+            ajaxCall && ajaxCall.abort();
+            ajaxCall = $.ajax({
+                type: "POST",
+                url: "WebService1.asmx/getNumCrawled",
+                data: JSON.stringify(data),
+                contentType: "application/json; charset=utf-8",
+                dataType: "json",
+                success: function (msg) {
+                    crawled = parseInt(msg.d);
+                    //console.log(msg.d)
+                    $('bold.numCrawled').html("<h3>" + crawled + "</h3>");
+                    //setTimeout(getNumCrawled, 8000)
+                    if (numCrawled != crawled) {
+                        var diff = crawled - numCrawled;
+                        $('bold.numCrawled').append("<p class=\"text-success\">+ " + diff + "</p>");
+                    }
+                    numCrawled = crawled;
+                },
+                error: function (a, b, c) {
+                }
+            })
+        }
+        function startCrawl() {
+            ajaxCall && ajaxCall.abort();
+            ajaxCall = $.ajax({
+                type: "POST",
+                url: "WebService1.asmx/startCrawl",
+                data: JSON.stringify(data),
+                contentType: "application/json; charset=utf-8",
+                dataType: "json",
+                success: function () {
+                    console.log('started crawling')
+                    //getStatus();
+                },
+                error: function () {
+                }
+            })
+        }
+        var prevNum = 0;
+        function getToCrawl() {
+            ajaxCall && ajaxCall.abort();
+            ajaxCall = $.ajax({
+                type: "POST",
+                url: "WebService1.asmx/getToCrawl",
+                data: JSON.stringify(data),
+                contentType: "application/json; charset=utf-8",
+                dataType: "json",
+                success: function (msg) {
+                    var currNum = parseInt(msg.d, 10);
+                    console.log(currNum + ":" + prevNum);
+                    var diff = currNum - prevNum;
+                    getNumCrawled();
+                    //console.log('urls left to crawl: ' + msg.d)
+                    $("bold.toCrawl").html("");
+                    $("bold.toCrawl").html("<h3 class=\"toCrawl\">" + currNum + "</h3>");
+                    if (diff >= 0) {
+                        $("bold.toCrawl").append("<p class=\"text-success\">+" + diff + "</p>");
+                    } else {
+                        $("bold.toCrawl").append("<p class=\"text-danger\">"+diff+"</p>");
+                    }
+                    prevNum = currNum;
+                    console.log(prevNum);
+                    //setTimeout(getToCrawl(), 5000)
+                },
+                error: function () {
+                }
+            })
+        }
+    </script>
+</body>
+</html>

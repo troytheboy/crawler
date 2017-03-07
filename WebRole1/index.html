@@ -1,77 +1,145 @@
 ﻿<!DOCTYPE html>
 <html>
 <head>
-    <title>Crawler</title>
+    <title>YOU WON A BILLION DOLLARS</title>
     <meta charset="utf-8" />
     <link href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-BVYiiSIFeK1dGmJRAkycuHAHRg32OmUcww7on3RYdg4Va+PmSTsz/K68vbdEjh4u" crossorigin="anonymous">
     <link href="/main.css" rel="stylesheet" type="text/css" />
     <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.1.1/jquery.min.js"></script>
-    <script src="https://code.jquery.com/ui/1.12.1/jquery-ui.js"></script>
+      <script src="https://code.jquery.com/ui/1.12.1/jquery-ui.js"></script>
 </head>
 <body>
-    <div class="jumbotron">
-        <div class="container">
-            <h1>Crawler</h1>
+    <div class="jumbotron text-center">
+        <!--<h1>Real Fake News Search</h1>
+        <img src="cnn.png" class="wiki" />-->
+        <img src="http://fontmeme.com/permalink/170307/87060be9596615f1357be04ad81aa105.png" alt="cnn-font" border="0">
+    </div>
+    <div class="container-fluid search-bar">
+        <div class="row">
+            <div class="col-md-4 trie trie-left">
+            </div> 
+            <div class="col-md-4 text-center">
+                <input placeholder="Search for words" class="search input" type="text" value="" name="w" id="w" onkeyup="getCrawled(); getNBA(); getWords(); " />
+                <table id="json" class="table table-striped results">
+                    <tbody class="results" id="results"></tbody>
+                </table>
+            </div>
+            <div class="col-md-4 trie trie-right">
+            </div> 
         </div>
     </div>
-    <div class="container">
+    <div class="text-center container-fluid">
         <div class="row">
-            <div class="col-md-3">
-                <button class="danger" onclick="getStatus()"><h1>Get Status:</h1></button>
+            <div class="col-md-4">
+                <div class="basketball container-fluid">
+                </div>
             </div>
-            <div class="col-md-2">
-                <h1 class="status"></h1>
-            </div>
-        </div>
-    </div>
-    <div class="container">
-        <div class="row">
-            <div class="col-md-5">
-                <button class="danger" onclick="getSize()"><h1>Get Number of Urls:</h1></button>
-            </div>
-            <div class="col-md-1">
-                <h1 class="size"></h1>
+            <div class="col-md-4">
+                <table class="text-center crawled table">
+                    <tbody class="crawled"></tbody>
+                </table>    
             </div>
         </div>
     </div>
     <script>
         var ajaxCall;
-        var data = { "query": ''};
-        function getStatus() {       
-                ajaxCall && ajaxCall.abort();
-                ajaxCall = $.ajax({
+        var ajaxCall2;
+        var ajaxCall3;
+        function getWords() {
+                var data = { "query": ($('#w').val()) };
+                $("div.basketball").html("");
+                w = $('#w').val();
+                if (!(w == '')) {
+                    ajaxCall = $.ajax({
+                        type: "POST",
+                        url: "WebService1.asmx/searchTrie",
+                        data: JSON.stringify(data),
+                        contentType: "application/json; charset=utf-8",
+                        dataType: "json",
+                        success: function (msg) {
+                            console.log(msg.d)
+                            $("div.trie").html("");
+                            var t = '';
+                            if (msg.d[0] != null) {
+                                for (var i = 0; i < 10; i++) {
+                                    if (msg.d[i] != null) {
+                                        if (i % 2 == 0) {
+                                            $("div.trie-left").append("<bold class=\"trie\">" + msg.d[i] + "</bold>")
+                                        } else {
+                                            $("div.trie-right").append("<bold class=\"trie\">" + msg.d[i] + "</bold>")
+                                        }
+                                    }
+                                }
+                            } else {
+                                //t = "<tr><td> Sorry we couldn't find anything for you </td><tr>";
+                            }
+                            //$("tbody.results").html(t);
+                            msg = null;
+                            if ($('#w').val() == '') {
+                                $("span.trie").html("");
+                            }
+                        },
+                        error: function (a, b, c) {
+                        }
+                    });
+                } else {
+                    $("tbody.results").html("");
+                    $("tbody.crawled").html("");
+                }
+        }
+        function getCrawled() {
+            if (!(w == '')) {
+                var data = { "searchQuery": ($('#w').val().toLowerCase()) };
+                //console.log(data);
+                ajaxCall2 = $.ajax({
                     type: "POST",
-                    url: "WebService1.asmx/getStatus",
+                    url: "WebService1.asmx/getCrawled",
                     data: JSON.stringify(data),
                     contentType: "application/json; charset=utf-8",
                     dataType: "json",
                     success: function (msg) {
-                        console.log(msg)
-                        $("h1.status").html("");
-                        $("h1.status").html("<h1>" + msg.d + "</h1>");
+                        //console.log(msg)
+                        //$("tbody.crawled").html("<tr><th>Results</th></tr>");
+                        $("tbody.crawled").html("");
+                        var count = 0;
+                        msg.d.forEach(function (link) {
+                            count++;
+                            //console.log(link);
+                            $("tbody.crawled").append("<tr><td class=\"\"><a href =\"" + link + "\">" + link + "</a></td></tr>")
+                        })
+                        if (count == 0) {
+                            $("tbody.crawled").html("<tr><th class=\"text-center\">No results</th></tr>");
+                        }
                     },
                     error: function (a, b, c) {
                     }
                 })
+            } else {
+                $("tbody.crawled").html("");
+            }
         }
-        function getSize() {
-            ajaxCall && ajaxCall.abort();
-            ajaxCall = $.ajax({
+        function getNBA() {
+            $("div.basketball").html("");
+            var data = { "player": ($('#w').val().toLowerCase()) };
+            ajaxCall3 = $.ajax({
                 type: "POST",
-                url: "WebService1.asmx/getSize",
+                crossDomain: true,
+                url: "http://troybarnard.com/info344/info344/a1/index.php?player=" + ($('#w').val().toLowerCase()),
                 data: JSON.stringify(data),
-                contentType: "application/json; charset=utf-8",
+                //contentType: "application/json; charset=utf-8",
                 dataType: "json",
                 success: function (msg) {
-                    console.log(msg)
-                    $("h1.size").html("");
-                    $("h1.size").html("<h1>" + msg.d + "</h1>");
+                    console.log(msg.d);
+                    var name = msg.Name.toLowerCase().split(' ');
+                    console.log(name)
+                    $("div.basketball").append("<h2>" + msg.Name + "</h2><hr><h3>" + msg.Team + "</h3><br><h4>Games Played: <small>" + msg.GP + "</small></h4><h4>Points Per Game: <small>" + msg[21] + "</small</h4>");
+                    $("div.basketball").append("<div class=\"text-right\"><img class=\"basketball\" src=\"https://nba-players.herokuapp.com/players/" + name[1] + "/" + name[0] + "\"/>")
                 },
                 error: function (a, b, c) {
                 }
             })
         }
     </script>
-
 </body>
+
 </html>

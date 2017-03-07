@@ -1,2 +1,2 @@
-﻿url to azure instance http://counter.cloudapp.net/
-url to github https://github.com/troytheboy/crawler
+﻿URL to Azure instance http://counter.cloudapp.net/
+URL to github repro https://github.com/troytheboy/PA2

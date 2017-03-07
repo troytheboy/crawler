@@ -1,6 +1,9 @@
-﻿using Microsoft.WindowsAzure.Storage.Queue;
+﻿using Microsoft.WindowsAzure.Storage;
+using Microsoft.WindowsAzure.Storage.Queue;
 using System;
 using System.Collections.Generic;
+using System.Configuration;
+using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Net;
@@ -16,6 +19,11 @@ namespace WorkerRole1
         private List<string> disallow = new List<string>();
         private List<string> sitemaps = new List<string>();
         private List<string> urls = new List<string>();
+        private static CloudStorageAccount storageAccount = CloudStorageAccount.Parse(
+                ConfigurationManager.AppSettings["StorageConnectionString"]);
+        private static CloudQueueClient queueClient = storageAccount.CreateCloudQueueClient();
+        private static CloudQueue toCrawl = queueClient.GetQueueReference("urls");
+
         //private static CloudQueue queue;
         private static string site;
 
@@ -24,6 +32,7 @@ namespace WorkerRole1
             site = newSite;
             getSitemaps();
             getMapUrls();
+            Crawl();
         }
 
         public List<string> getUrls()
@@ -45,14 +54,11 @@ namespace WorkerRole1
         {
             // get robots.txt
             WebClient client = new WebClient();
+            string rbts = site + "/robots.txt";
             Stream robots = client.OpenRead(site + "/robots.txt");
-            //Stream cnn = client.OpenRead("http://www.cnn.com/robots.txt");
-            //Stream bleacher = client.OpenRead("http://www.bleacherreprot.com/robots.txt");
             StreamReader sr = new StreamReader(robots);
 
             // get all site maps
-            //List<string> sitemaps = new List<string>();
-            //List<string> disallow = new List<string>();
             while (!sr.EndOfStream)
             {
                 string line = sr.ReadLine();
@@ -67,30 +73,30 @@ namespace WorkerRole1
             }
             // get urls from sitemaps
             List<string> urls = new List<string>();
-            //List<Page> pages = new List<Page>();
             XmlDocument xmlDoc = new XmlDocument(); // Create an XML document object
             List<string> indexedMaps = new List<string>();
-
-            // look through sitemaps for sitemap indexes and add sitemaps from those indexes to a list
-            foreach (string sitemap in sitemaps)
+            if (site.Contains("cnn"))
             {
-                xmlDoc.Load(sitemap); // Load the XML document from the specified file
-                XmlNodeList maps = xmlDoc.GetElementsByTagName("sitemap");
-                if (maps.Count > 0)
+                // look through sitemaps for sitemap indexes and add sitemaps from those indexes to a list
+                foreach (string sitemap in sitemaps)
                 {
-                    // add to sitemaps list
-                    foreach (XmlNode map in maps)
+                    xmlDoc.Load(sitemap); // Load the XML document from the specified file
+                    XmlNodeList maps = xmlDoc.GetElementsByTagName("sitemap");
+                    if (maps.Count > 0)
                     {
-                        XmlNode loc = map.FirstChild;
-                        if (loc.InnerText.Contains("2017"))
+                        // add to sitemaps list
+                        foreach (XmlNode map in maps)
                         {
-                            //XmlNodeList children = map.ChildNodes;
-                            indexedMaps.Add(loc.InnerText);
+                            XmlNode loc = map.FirstChild;
+                            if (loc.InnerText.Contains("2017"))
+                            {
+                                //XmlNodeList children = map.ChildNodes;
+                                indexedMaps.Add(loc.InnerText);
+                            }
                         }
                     }
                 }
             }
-
             // add each map from the map index into the sitemaps list
             foreach (string map in indexedMaps)
             {
@@ -121,103 +127,91 @@ namespace WorkerRole1
         {
             // get robots.txt
             WebClient client = new WebClient();
-            Stream cnn = client.OpenRead("http://www.cnn.com/robots.txt");
-            Stream bleacher = client.OpenRead("http://www.bleacherreprot.com/robots.txt");
-            StreamReader sr = new StreamReader(cnn);
-
-            // get all site maps
-            List<string> sitemaps = new List<string>();
-            //List<string> disallow = new List<string>();
-            while (!sr.EndOfStream)
+            try
             {
-                string line = sr.ReadLine();
-                if (line.StartsWith("Sitemap: "))
-                {
-                    sitemaps.Add(line.Remove(0, 9));
-                }
-                if (line.StartsWith("Disallow: "))
-                {
-                    disallow.Add("http://cnn.com" + line.Remove(0, 10));
-                }
-            }
-            sr = new StreamReader(bleacher);
-            while (!sr.EndOfStream)
-            {
-                string line = sr.ReadLine();
-                if (line.StartsWith("Disallow: "))
-                {
-                    disallow.Add("http://bleacherreport.com" + line.Remove(0, 10));
-                }
-            }
+                Stream cnn = client.OpenRead("http://www.cnn.com/robots.txt");
+                Stream bleacher = client.OpenRead("http://www.bleacherreport.com/robots.txt");
+                StreamReader sr = new StreamReader(cnn);
 
-            // get urls from sitemaps
-            List<string> urls = new List<string>();
-            //List<Page> pages = new List<Page>();
-            XmlDocument xmlDoc = new XmlDocument(); // Create an XML document object
-            List<string> indexedMaps = new List<string>();
-
-            // look through sitemaps for sitemap indexes and add sitemaps from those indexes to a list
-            foreach (string sitemap in sitemaps)
-            {
-                xmlDoc.Load(sitemap); // Load the XML document from the specified file
-                XmlNodeList maps = xmlDoc.GetElementsByTagName("sitemap");
-                if (maps.Count > 0)
+                // get all site maps
+                List<string> sitemaps = new List<string>();
+                while (!sr.EndOfStream)
                 {
-                    // add to sitemaps list
-                    foreach (XmlNode map in maps)
+                    string line = sr.ReadLine();
+                    if (line.StartsWith("Sitemap: "))
                     {
-                        XmlNode loc = map.FirstChild;
-                        if (loc.InnerText.Contains("2017"))
+                        sitemaps.Add(line.Remove(0, 9));
+                    }
+                    if (line.StartsWith("Disallow: "))
+                    {
+                        disallow.Add("http://cnn.com" + line.Remove(0, 10));
+                    }
+                }
+                sr = new StreamReader(bleacher);
+                while (!sr.EndOfStream)
+                {
+                    string line = sr.ReadLine();
+                    if (line.StartsWith("Disallow: "))
+                    {
+                        disallow.Add("http://bleacherreport.com" + line.Remove(0, 10));
+                    }
+                    if (line.StartsWith("Sitemap: ") && line.Contains("nba"))
+                    {
+                        sitemaps.Add(line.Remove(0, 9));
+                    }
+                }
+
+                // get urls from sitemaps
+                //List<string> urls = new List<string>();
+                XmlDocument xmlDoc = new XmlDocument(); // Create an XML document object
+                List<string> indexedMaps = new List<string>();
+
+                // look through sitemaps for sitemap indexes and add sitemaps from those indexes to a list
+                foreach (string sitemap in sitemaps)
+                {
+                    xmlDoc.Load(sitemap); // Load the XML document from the specified file
+                    XmlNodeList maps = xmlDoc.GetElementsByTagName("sitemap");
+                    if (maps.Count > 0)
+                    {
+                        // add to sitemaps list
+                        foreach (XmlNode map in maps)
                         {
-                            //XmlNodeList children = map.ChildNodes;
-                            indexedMaps.Add(loc.InnerText);
+                            XmlNode loc = map.FirstChild;
+                            if (loc.InnerText.Contains("2017"))
+                            {
+                                //XmlNodeList children = map.ChildNodes;
+                                indexedMaps.Add(loc.InnerText);
+                            }
                         }
                     }
                 }
-            }
 
-            // add maps from map indexes to sitemaps list
-            foreach (string map in indexedMaps)
-            {
-                sitemaps.Add(map);
-            }
-            foreach (string sitemap in sitemaps)
-            {
-                xmlDoc = new XmlDocument(); // Create an XML document object
-                xmlDoc.Load(sitemap);
-                XmlNodeList nodes = xmlDoc.GetElementsByTagName("url");
-                foreach (XmlNode node in nodes)
+                WebCrawler crawlie = new WebCrawler(disallow);
+                WebCrawler webbie = new WebCrawler(disallow);
+                //WebCrawler diddler = new WebCrawler(disallow);
+                // add maps from map indexes to sitemaps list
+                foreach (string map in indexedMaps)
                 {
-                    XmlNodeList children = node.ChildNodes;
-
-                    XmlNode loc = node.FirstChild;
-                    urls.Add(loc.InnerText);
-
-                    //foreach (XmlNode child in children)
-                    //{
-                    //    string name = child.Name;
-                    //    if (name.Equals("loc"))
-                    //    {
-                    //        page.setUrl(child.InnerText);
-                    //    }
-                    //    if (name.Equals("news:news"))
-                    //    {
-                    //        XmlNodeList grandChildren = child.ChildNodes;
-                    //        foreach (XmlNode grandChild in grandChildren)
-                    //        {
-                    //            if (grandChild.Name.Equals("news:publication_date"))
-                    //            {
-                    //                page.setDate(grandChild.InnerText);
-                    //            }
-                    //            if (grandChild.Name.Equals("news:title"))
-                    //            {
-                    //                page.setTitle(grandChild.InnerText);
-                    //            }
-                    //        }
-                    //    }
-                    //}
-                    //pages.Add(page);
+                    sitemaps.Add(map);
                 }
+                foreach (string sitemap in sitemaps)
+                {
+                    xmlDoc = new XmlDocument(); // Create an XML document object
+                    xmlDoc.Load(sitemap);
+                    XmlNodeList nodes = xmlDoc.GetElementsByTagName("url");
+                    foreach (XmlNode node in nodes)
+                    {
+                        XmlNodeList children = node.ChildNodes;
+                        XmlNode loc = node.FirstChild;
+                        urls.Add(loc.InnerText);
+                        CloudQueueMessage urlToCrawl = new CloudQueueMessage(loc.InnerText);
+                        toCrawl.AddMessage(urlToCrawl);
+                    }
+                }
+            }
+            catch (Exception e)
+            {
+                Debug.WriteLine(e);
             }
             return urls;
         }

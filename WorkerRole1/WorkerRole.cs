@@ -11,7 +11,6 @@ using Microsoft.WindowsAzure.ServiceRuntime;
 using Microsoft.WindowsAzure.Storage;
 using Microsoft.WindowsAzure.Storage.Queue;
 using System.Configuration;
-using WebRole1;
 using Microsoft.WindowsAzure.Storage.Table; // Namespace for Table storage types
 
 namespace WorkerRole1
@@ -20,15 +19,16 @@ namespace WorkerRole1
     {
         private readonly CancellationTokenSource cancellationTokenSource = new CancellationTokenSource();
         private readonly ManualResetEvent runCompleteEvent = new ManualResetEvent(false);
-        private static CloudQueue status;
-        private List<string> crawled = new List<string>();
-        private static CloudQueue urls;
+        private static CloudStorageAccount storageAccount = CloudStorageAccount.Parse(
+                ConfigurationManager.AppSettings["StorageConnectionString"]);
+        private static CloudQueueClient queueClient = storageAccount.CreateCloudQueueClient();
+        private static CloudQueue statusQueue = queueClient.GetQueueReference("status");
+        private static CloudQueue toCrawl = queueClient.GetQueueReference("urls");
+        private static CloudQueue crawled = queueClient.GetQueueReference("crawled");
+
 
         public override void Run()
         {
-
-            
-
             Trace.TraceInformation("WorkerRole1 is running");
 
             try
@@ -43,19 +43,27 @@ namespace WorkerRole1
 
         public override bool OnStart()
         {
+            try
+            {
+                statusQueue.CreateIfNotExists();
+                statusQueue.Clear();
+                CloudQueueMessage loading = new CloudQueueMessage("Loading...");
+                statusQueue.AddMessage(loading);
 
-            CloudStorageAccount storageAccount = CloudStorageAccount.Parse(
-                ConfigurationManager.AppSettings["StorageConnectionString"]);
-            CloudQueueClient queueClient = storageAccount.CreateCloudQueueClient();
-            status = queueClient.GetQueueReference("status");
-            status.CreateIfNotExists();
+                toCrawl.CreateIfNotExists();
+                toCrawl.Clear();
 
-            CloudQueueMessage message = new CloudQueueMessage("Loading");
-            status.Clear();
-            status.AddMessage(message);
+                crawled.CreateIfNotExists();
+                crawled.Clear();
+            }
+            catch (Exception e)
+            {
+                Debug.WriteLine(e);
+            }
 
             // Set the maximum number of concurrent connections
             ServicePointManager.DefaultConnectionLimit = 12;
+            //ServicePointManager.Expect100Continue = false;
 
             // For information on handling configuration changes
             // see the MSDN topic at https://go.microsoft.com/fwlink/?LinkId=166357.
@@ -64,72 +72,96 @@ namespace WorkerRole1
 
             // create sitemappers
             SiteMapper cnnMapper = new SiteMapper("http://www.cnn.com");
+
             List<string> cnnUrls = cnnMapper.getUrls();
             List<string> disallow = cnnMapper.getDisallow();
-            SiteMapper brMapper = new SiteMapper("http://www.bleacherreport.com");
+            //SiteMapper brMapper = new SiteMapper("http://www.bleacherreport.com");
             //List<string> brUrls = brMapper.getUrls();
-            disallow.AddRange(brMapper.getDisallow());
-
-            
-            urls = queueClient.GetQueueReference("urls");
-            urls.CreateIfNotExists();
+            //disallow.AddRange(brMapper.getDisallow());
 
             // create web crawlers
-            WebCrawler crawlie = new WebCrawler(disallow);
-            int count = 0;
-            foreach (string url in cnnUrls)
-            {
-                count++;
-                if (count > 10)
-                {
-                    break;
-                }
-                HttpWebRequest request = (HttpWebRequest)WebRequest.Create(url);
-                try
-                {
-                    HttpWebResponse response = (HttpWebResponse)request.GetResponse();
-                    List<string> pageUrls = crawlie.CrawlPage(response, url);
-                    foreach (string crawledUrl in pageUrls)
-                    {
-                        if (!crawled.Contains(crawledUrl))
-                        {
-                            CloudQueueMessage QueueMessage = new CloudQueueMessage(crawledUrl);
-                            urls.AddMessage(QueueMessage);
-                            crawled.Add(crawledUrl);
-                        }
-                    }
-                }
-                catch (WebException we)
-                {
-                    if (we.Equals("test"))
-                    {
+            //WebCrawler crawlie = new WebCrawler(disallow);
 
-                    }
-                    continue;
-                }
-            }
             Trace.TraceInformation("WorkerRole1 has been started");
 
-            CloudQueueMessage message2 = new CloudQueueMessage("Idle");
-            status.Clear();
-            status.AddMessage(message2);
+            updateStatus("Idle");
 
-            while (true)
+            //while (true)
+            //{
+            //    string statusMessage = peekStatus();
+            //    if (statusMessage.Equals("Start"))
+            //    {
+            //        //start crawling
+            //        updateStatus("Crawling");
+            //        //crawl(crawlie);
+            //    }
+            //    Thread.Sleep(1000);
+            //}
+
+            return result;
+        }
+
+        private void crawl(WebCrawler crawlie)
+        {
+            CloudQueueMessage message = toCrawl.PeekMessage();
+            while(message != null)
             {
-                CloudQueueMessage statusMessage = status.PeekMessage();
-                if (statusMessage.AsString.Equals("Start"))
+                message = toCrawl.GetMessage();
+                toCrawl.DeleteMessage(message);
+                string url = message.AsString;
+                string cnn = "cnn.com";
+                string br = "bleacherreport.com";
+                if (url.Contains('.'))
                 {
-                    //start crawling
-                    statusMessage = new CloudQueueMessage("Crawling");
-                    status.AddMessage(statusMessage);
-                    Debug.WriteLine("Message from queue: " + message.AsString);
-                    status.AddMessage(statusMessage);
-                    status.GetMessage();
-                }
-                Thread.Sleep(1000);
-            }
+                    if (url.StartsWith("//"))
+                    {
+                        url = url.Replace("//", "http://www.");
+                    }
+                    try
+                    {
+                        HttpWebRequest request = (HttpWebRequest)WebRequest.Create(url);
+                        request.Proxy = null;
+                        HttpWebResponse response = (HttpWebResponse)request.GetResponse();
+                        if (url.Contains(cnn))
+                        {
+                            crawlie.CrawlPage(response, url, cnn);
+                        }
+                        else if (url.Contains(br))
+                        {
+                            crawlie.CrawlPage(response, url, br);
+                        }
+                    }
+                    catch (WebException we)
+                    {
+                        if (we.Equals("test"))
+                        {
 
-            //return result;
+                        }
+                        continue;
+                    }
+                }
+            }
+        }
+
+        private void updateStatus(string statusMessage)
+        {
+            CloudQueueMessage message = statusQueue.GetMessage();
+            statusQueue.DeleteMessage(message);
+            CloudQueueMessage update = new CloudQueueMessage(statusMessage);
+            statusQueue.AddMessage(update);
+        }
+
+        private string peekStatus()
+        {
+            CloudQueueMessage message = statusQueue.PeekMessage();
+            if (message == null)
+            {
+                return "Switching Status";
+            } else
+            {
+                return message.AsString;
+
+            }
         }
 
         public override void OnStop()
